@@ -102,26 +102,42 @@
   </header>
 
   <!-- Main Content Area -->
-  <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-32 hide-scrollbar flex flex-col space-y-5">
+  <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-32 hide-scrollbar flex flex-col space-y-4">
     
     <!-- Mode Selector -->
     <div class="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex space-x-1 relative">
-      <div id="modeBg" class="absolute left-1 top-1 bottom-1 w-1/3 bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-in-out"></div>
-      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-bold text-busan-dark rounded-xl transition-colors" data-mode="busan">
+      <div id="modeBg" class="absolute left-1 top-1 bottom-1 w-[23.5%] bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-in-out"></div>
+      <button class="mode-btn relative z-10 flex-1 py-2 text-xs sm:text-sm font-bold text-busan-dark rounded-xl transition-colors whitespace-nowrap" data-mode="busan">
         釜山意訳
       </button>
-      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-medium text-slate-500 rounded-xl transition-colors" data-mode="ja2ko">
+      <button class="mode-btn relative z-10 flex-1 py-2 text-xs sm:text-sm font-medium text-slate-500 rounded-xl transition-colors whitespace-nowrap" data-mode="ja2ko">
         日 ➔ 韓
       </button>
-      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-medium text-slate-500 rounded-xl transition-colors" data-mode="ko2ja">
+      <button class="mode-btn relative z-10 flex-1 py-2 text-xs sm:text-sm font-medium text-slate-500 rounded-xl transition-colors whitespace-nowrap" data-mode="ko2ja">
         韓 ➔ 日
+      </button>
+      <button class="mode-btn relative z-10 flex-1 py-2 text-xs sm:text-sm font-medium text-slate-500 rounded-xl transition-colors whitespace-nowrap" data-mode="auto">
+        自動翻訳
       </button>
     </div>
 
     <!-- Mode Description -->
-    <p id="modeDesc" class="text-xs text-slate-500 px-2 text-center">
+    <p id="modeDesc" class="text-xs text-slate-500 px-2 text-center h-4">
       釜山の20代男性風（男らしく親しみやすい方言）に意訳します。
     </p>
+
+    <!-- Auto Mode Target Language Selector (Hidden by default) -->
+    <div id="autoModeSettings" class="hidden justify-center items-center space-x-2 transition-all">
+      <span class="text-xs font-semibold text-slate-500">翻訳先:</span>
+      <select id="targetLangSelect" class="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow">
+        <option value="英語">英語</option>
+        <option value="韓国語">韓国語</option>
+        <option value="日本語">日本語</option>
+        <option value="中国語">中国語</option>
+        <option value="スペイン語">スペイン語</option>
+        <option value="フランス語">フランス語</option>
+      </select>
+    </div>
 
     <!-- Input Area -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden focus-within:ring-2 focus-within:ring-busan/50 transition-all">
@@ -129,7 +145,7 @@
         <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Input</span>
         <button id="clearBtn" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-eraser"></i></button>
       </div>
-      <textarea id="inputText" class="w-full p-4 h-32 resize-none outline-none text-base text-slate-700 bg-transparent placeholder-slate-300" placeholder="テキストを入力してください..."></textarea>
+      <textarea id="inputText" class="w-full p-4 h-32 resize-none outline-none text-base text-slate-700 bg-transparent placeholder-slate-300" placeholder="テキストを入力、または貼り付け..."></textarea>
     </div>
 
     <!-- Output Area -->
@@ -179,14 +195,40 @@
       </div>
       
       <div class="overflow-y-auto flex-1 hide-scrollbar space-y-6 pb-6">
-        <!-- API Key -->
-        <div class="space-y-2">
-          <label class="block text-sm font-semibold text-slate-700">Gemini API Key <span class="text-red-500">*</span></label>
-          <div class="relative">
-            <input type="password" id="apiKeyInput" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow" placeholder="AI Studioで取得したキーを入力">
-            <button id="toggleApiKey" class="absolute right-3 top-3 text-slate-400"><i class="fa-regular fa-eye"></i></button>
+        
+        <!-- API Configuration -->
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700">AIモデル <span class="text-busan">*</span></label>
+            <select id="aiModelSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (超高速・標準)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (高精度・高品質)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash (軽量)</option>
+            </select>
           </div>
-          <p class="text-xs text-slate-400">キーはブラウザ内部(IndexedDB)に暗号化されず保存されます。端末外へは送信されません。</p>
+
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700">Gemini API Key <span class="text-red-500">*</span></label>
+            <div class="relative">
+              <input type="password" id="apiKeyInput" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow" placeholder="AI Studioで取得したキーを入力">
+              <button id="toggleApiKey" class="absolute right-3 top-3 text-slate-400"><i class="fa-regular fa-eye"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">キーはブラウザ内部(IndexedDB)に暗号化されず保存されます。端末外へは送信されません。</p>
+          </div>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Automation Settings -->
+        <div class="flex items-center justify-between">
+          <div class="space-y-0.5">
+            <label class="text-sm font-semibold text-slate-700">貼り付け時に自動翻訳</label>
+            <p class="text-xs text-slate-400">テキストをペーストした直後にAI生成を開始します</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="autoPasteToggle" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-busan"></div>
+          </label>
         </div>
 
         <hr class="border-slate-100">
@@ -219,6 +261,15 @@
                 <button class="reset-prompt-btn text-xs text-busan hover:text-busan-dark transition-colors" data-mode="ko2ja">デフォルトに戻す</button>
               </div>
               <textarea id="prompt-ko2ja" class="prompt-input w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow h-16 resize-none" data-mode="ko2ja"></textarea>
+            </div>
+            <!-- Auto -->
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-semibold text-slate-600">自動翻訳</label>
+                <button class="reset-prompt-btn text-xs text-busan hover:text-busan-dark transition-colors" data-mode="auto">デフォルトに戻す</button>
+              </div>
+              <textarea id="prompt-auto" class="prompt-input w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow h-16 resize-none" data-mode="auto"></textarea>
+              <p class="text-[10px] text-slate-400">※ {targetLang} は選択された言語に自動置換されます。</p>
             </div>
           </div>
         </div>
@@ -311,7 +362,7 @@
       }
     };
 
-    // Service Worker for PWA (Inline Blob)
+    // Service Worker for PWA
     const swCode = `
       const CACHE_NAME = 'busanboy-v1';
       self.addEventListener('install', (e) => { self.skipWaiting(); });
@@ -395,11 +446,11 @@
     }
 
     /* =========================================
-     * 3. Web Worker for Gemini API (SSE Stream)
+     * 3. Web Worker for AI API (SSE Stream)
      * ========================================= */
     const workerCode = `
       self.onmessage = async (e) => {
-        const { apiKey, text, systemInstruction, sessionId } = e.data;
+        const { apiKey, model, text, systemInstruction, sessionId } = e.data;
         if (e.data.type === 'terminate') { self.close(); return; }
 
         const payload = {
@@ -409,7 +460,7 @@
         };
 
         try {
-          const url = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=\${apiKey}\`;
+          const url = \`https://generativelanguage.googleapis.com/v1beta/models/\${model}:streamGenerateContent?alt=sse&key=\${apiKey}\`;
           const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -473,17 +524,21 @@
         this.defaultPrompts = {
           'busan': "あなたは韓国・釜山出身の20代男性です。親しみやすく、男らしく、少し強気で情熱的な性格です。ユーザーの日本語を、釜山方言（慶尚道方言）を使った韓国語に意訳してください。出力フォーマットはMarkdownを使用し、最初に【🇰🇷釜山方言での意訳】、次に【🇯🇵その日本語訳（直訳気味でOK）】、最後に【📝解説や一言（釜山男らしく）】を含めてください。",
           'ja2ko': "あなたは優秀な翻訳者です。ユーザーの日本語を自然な標準韓国語に翻訳してください。出力は翻訳結果のみを提示してください。",
-          'ko2ja': "あなたは優秀な翻訳者です。ユーザーの韓国語を自然な日本語に翻訳してください。出力は翻訳結果のみを提示してください。"
+          'ko2ja': "あなたは優秀な翻訳者です。ユーザーの韓国語を自然な日本語に翻訳してください。出力は翻訳結果のみを提示してください。",
+          'auto': "あなたは優秀な翻訳アシスタントです。入力されたテキストの言語を自動判定し、{targetLang}に自然な形で翻訳してください。出力は翻訳結果のみを提示してください。もし入力が既に{targetLang}である場合は、文章の校正や洗練を行ってください。"
         };
 
         this.state = {
           apiKey: '',
+          aiModel: 'gemini-2.5-flash',
           mode: 'busan',
+          targetLang: '英語',
+          autoTranslateOnPaste: true,
           inputText: '',
           outputText: '',
           isGenerating: false,
           currentSessionId: null,
-          customPrompts: { busan: '', ja2ko: '', ko2ja: '' }
+          customPrompts: { busan: '', ja2ko: '', ko2ja: '', auto: '' }
         };
         this.wakeLock = null;
         
@@ -497,6 +552,10 @@
           copyBtn: document.getElementById('copyBtn'),
           loadingOverlay: document.getElementById('loadingOverlay'),
           apiKeyInput: document.getElementById('apiKeyInput'),
+          aiModelSelect: document.getElementById('aiModelSelect'),
+          targetLangSelect: document.getElementById('targetLangSelect'),
+          autoPasteToggle: document.getElementById('autoPasteToggle'),
+          autoModeSettings: document.getElementById('autoModeSettings'),
           modeBtns: document.querySelectorAll('.mode-btn'),
           modeBg: document.getElementById('modeBg'),
           modeDesc: document.getElementById('modeDesc')
@@ -505,7 +564,8 @@
         this.modeDescriptions = {
           'busan': '釜山の20代男性風（男らしく親しみやすい方言）に意訳します。',
           'ja2ko': '日本語を自然な標準韓国語に翻訳します。',
-          'ko2ja': '韓国語を自然な日本語に翻訳します。'
+          'ko2ja': '韓国語を自然な日本語に翻訳します。',
+          'auto': '言語を自動判定し、選択した言語へ翻訳します。'
         };
 
         this.debouncedSave = utils.debounce(() => this.saveState(), 1000);
@@ -517,8 +577,6 @@
         this.bindEvents();
         createWorker();
         this.updateUI();
-        
-        // Settings / History modals logic
         this.initModals();
       }
 
@@ -531,6 +589,8 @@
             customPrompts: { ...this.state.customPrompts, ...(saved.customPrompts || {}) },
             isGenerating: false 
           };
+          // Ensure autoPrompt exists
+          if(this.state.customPrompts.auto === undefined) this.state.customPrompts.auto = '';
         }
       }
 
@@ -538,7 +598,10 @@
         if(!skipStatus) utils.updateStatus('Saving...');
         await this.db.set('state', 'appState', {
           apiKey: this.state.apiKey,
+          aiModel: this.state.aiModel,
           mode: this.state.mode,
+          targetLang: this.state.targetLang,
+          autoTranslateOnPaste: this.state.autoTranslateOnPaste,
           inputText: this.state.inputText,
           outputText: this.state.outputText,
           customPrompts: this.state.customPrompts
@@ -553,6 +616,19 @@
           this.debouncedSave();
         });
 
+        // Auto translate on Paste
+        this.els.inputText.addEventListener('paste', () => {
+          if (this.state.autoTranslateOnPaste) {
+            setTimeout(() => {
+              this.state.inputText = this.els.inputText.value;
+              this.debouncedSave();
+              if (!this.state.isGenerating) {
+                this.toggleGeneration();
+              }
+            }, 100);
+          }
+        });
+
         // Mode switching
         this.els.modeBtns.forEach((btn, index) => {
           btn.addEventListener('click', () => {
@@ -563,6 +639,12 @@
             this.saveState();
             this.updateUI();
           });
+        });
+
+        // Target Lang Select
+        this.els.targetLangSelect.addEventListener('change', (e) => {
+          this.state.targetLang = e.target.value;
+          this.saveState();
         });
 
         // Actions
@@ -585,7 +667,7 @@
 
         this.els.generateBtn.addEventListener('click', () => this.toggleGeneration());
 
-        // API Key Settings
+        // Settings Inputs
         this.els.apiKeyInput.addEventListener('input', (e) => {
           this.state.apiKey = e.target.value.trim();
           this.debouncedSave();
@@ -595,6 +677,16 @@
           const t = this.els.apiKeyInput.type;
           this.els.apiKeyInput.type = t === 'password' ? 'text' : 'password';
           e.currentTarget.innerHTML = t === 'password' ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
+        });
+
+        this.els.aiModelSelect.addEventListener('change', (e) => {
+          this.state.aiModel = e.target.value;
+          this.saveState();
+        });
+
+        this.els.autoPasteToggle.addEventListener('change', (e) => {
+          this.state.autoTranslateOnPaste = e.target.checked;
+          this.saveState();
         });
 
         // Custom Prompts
@@ -622,8 +714,9 @@
         if(activeIndex === -1) {
           this.els.modeBtns.forEach((b, i) => { if(b.dataset.mode === this.state.mode) activeIndex = i; });
         }
-        const positions = ['left-1', 'left-[33.3%]', 'left-[66.6%]'];
-        this.els.modeBg.className = `absolute top-1 bottom-1 w-[32%] bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-out shadow-sm ${positions[activeIndex]}`;
+        // w-[23.5%] roughly represents 1/4 with gap
+        const positions = ['left-1', 'left-[25.5%]', 'left-[50.5%]', 'left-[75.5%]'];
+        this.els.modeBg.className = `absolute top-1 bottom-1 w-[23.5%] bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-out shadow-sm ${positions[activeIndex]}`;
         
         this.els.modeBtns.forEach((btn, i) => {
           if (i === activeIndex) {
@@ -640,10 +733,22 @@
       updateUI() {
         this.els.inputText.value = this.state.inputText;
         this.els.apiKeyInput.value = this.state.apiKey;
+        this.els.aiModelSelect.value = this.state.aiModel || 'gemini-2.5-flash';
+        this.els.targetLangSelect.value = this.state.targetLang || '英語';
+        this.els.autoPasteToggle.checked = this.state.autoTranslateOnPaste !== false;
+
         this.updateModeUI();
 
+        if (this.state.mode === 'auto') {
+          this.els.autoModeSettings.classList.remove('hidden');
+          this.els.autoModeSettings.classList.add('flex');
+        } else {
+          this.els.autoModeSettings.classList.add('hidden');
+          this.els.autoModeSettings.classList.remove('flex');
+        }
+
         // Update Prompt Textareas
-        ['busan', 'ja2ko', 'ko2ja'].forEach(m => {
+        ['busan', 'ja2ko', 'ko2ja', 'auto'].forEach(m => {
           const el = document.getElementById(`prompt-${m}`);
           if(el) {
             const targetVal = this.state.customPrompts[m] || this.defaultPrompts[m];
@@ -713,11 +818,15 @@
           this.els.outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
 
-        const currentPrompt = this.state.customPrompts[this.state.mode] || this.defaultPrompts[this.state.mode];
+        let currentPrompt = this.state.customPrompts[this.state.mode] || this.defaultPrompts[this.state.mode];
+        if (this.state.mode === 'auto') {
+          currentPrompt = currentPrompt.replace(/{targetLang}/g, this.state.targetLang || '英語');
+        }
 
         aiWorker.onmessage = (e) => this.handleWorkerMessage(e);
         aiWorker.postMessage({
           apiKey: this.state.apiKey,
+          model: this.state.aiModel || 'gemini-2.5-flash',
           text: this.state.inputText,
           systemInstruction: currentPrompt,
           sessionId: this.state.currentSessionId
@@ -736,7 +845,6 @@
           // Render chunk
           const dirty = marked.parse(this.state.outputText);
           this.els.outputText.innerHTML = DOMPurify.sanitize(dirty);
-          // Auto scroll to bottom of output occasionally (or let user scroll)
           this.debouncedSave();
         } else if (type === 'done') {
           this.finishGeneration(true);
@@ -922,7 +1030,7 @@
           return;
         }
 
-        const modeLabels = { 'busan': '釜山意訳', 'ja2ko': '日➔韓', 'ko2ja': '韓➔日' };
+        const modeLabels = { 'busan': '釜山意訳', 'ja2ko': '日➔韓', 'ko2ja': '韓➔日', 'auto': '自動翻訳' };
         
         listEl.innerHTML = '<div class="space-y-4">' + history.map(h => `
           <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-busan/50 transition-colors" onclick="app.loadHistoryItem(${h.id})">
