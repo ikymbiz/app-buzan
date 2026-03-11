@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>釜山Boy Translator</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Marked.js & DOMPurify -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.3/purify.min.js"></script>
+  
+  <!-- PWA Manifest (Data URI) -->
+  <script>
+    const manifestJSON = {
+      name: "釜山Boy Translator",
+      short_name: "釜山Boy",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#f8fafc",
+      theme_color: "#0ea5e9",
+      icons: [
+        {
+          src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230ea5e9' rx='20'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='white'%3E🌊%3C/text%3E%3C/svg%3E",
+          sizes: "192x192",
+          type: "image/svg+xml",
+          purpose: "any maskable"
+        }
+      ]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
+    document.write(`<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
+  </script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            busan: {
+              light: '#e0f2fe',
+              DEFAULT: '#0ea5e9',
+              dark: '#0284c7',
+            },
+            accent: '#f97316'
+          },
+          padding: {
+            safe: 'env(safe-area-inset-bottom)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Base Styles & Custom Scrollbar */
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+      -webkit-tap-highlight-color: transparent; 
+      overscroll-behavior-y: none;
+    }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    
+    /* Utilities */
+    .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Loader Animation */
+    .loader { border: 3px solid #f3f4f6; border-top-color: #0ea5e9; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    /* Markdown Styles */
+    .prose h3 { font-size: 1.125rem; font-weight: 700; color: #1e293b; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .prose p { margin-bottom: 0.75rem; line-height: 1.6; }
+    .prose strong { color: #0f172a; }
+    .prose blockquote { border-left: 4px solid #cbd5e1; padding-left: 1rem; color: #475569; font-style: italic; }
+
+    /* Modal transition */
+    .modal-enter { opacity: 0; transform: scale(0.95); }
+    .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+    .modal-exit { opacity: 1; transform: scale(1); }
+    .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.15s ease-in; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden w-full relative">
+
+  <!-- Header -->
+  <header class="glass border-b border-slate-200 px-4 py-3 flex justify-between items-center z-10 shrink-0 shadow-sm">
+    <div class="flex items-center space-x-2">
+      <div class="bg-busan text-white w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-md">🌊</div>
+      <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-busan-dark to-busan">釜山Boy</h1>
+    </div>
+    <div id="statusIndicator" class="text-xs font-medium text-slate-400 flex items-center space-x-1">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <span>Saved</span>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-32 hide-scrollbar flex flex-col space-y-5">
+    
+    <!-- Mode Selector -->
+    <div class="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex space-x-1 relative">
+      <div id="modeBg" class="absolute left-1 top-1 bottom-1 w-1/3 bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-in-out"></div>
+      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-bold text-busan-dark rounded-xl transition-colors" data-mode="busan">
+        釜山意訳
+      </button>
+      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-medium text-slate-500 rounded-xl transition-colors" data-mode="ja2ko">
+        日 ➔ 韓
+      </button>
+      <button class="mode-btn relative z-10 flex-1 py-2 text-sm font-medium text-slate-500 rounded-xl transition-colors" data-mode="ko2ja">
+        韓 ➔ 日
+      </button>
+    </div>
+
+    <!-- Mode Description -->
+    <p id="modeDesc" class="text-xs text-slate-500 px-2 text-center">
+      釜山の20代男性風（男らしく親しみやすい方言）に意訳します。
+    </p>
+
+    <!-- Input Area -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden focus-within:ring-2 focus-within:ring-busan/50 transition-all">
+      <div class="bg-slate-50 px-3 py-2 border-b border-slate-100 flex justify-between items-center">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Input</span>
+        <button id="clearBtn" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-eraser"></i></button>
+      </div>
+      <textarea id="inputText" class="w-full p-4 h-32 resize-none outline-none text-base text-slate-700 bg-transparent placeholder-slate-300" placeholder="テキストを入力してください..."></textarea>
+    </div>
+
+    <!-- Output Area -->
+    <div id="outputContainer" class="hidden flex-col">
+      <div class="bg-blue-50 rounded-2xl shadow-sm border border-blue-100 flex flex-col overflow-hidden relative">
+        <div class="bg-blue-100/50 px-3 py-2 border-b border-blue-100 flex justify-between items-center">
+          <span class="text-xs font-semibold text-busan-dark uppercase tracking-wider">Output</span>
+          <button id="copyBtn" class="text-busan hover:text-busan-dark transition-colors" title="コピー"><i class="fa-regular fa-copy"></i></button>
+        </div>
+        <div id="outputText" class="p-4 prose prose-sm max-w-none text-slate-700 min-h-[100px]"></div>
+        
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden absolute inset-0 bg-blue-50/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div class="loader mb-2"></div>
+          <p class="text-sm text-busan-dark font-medium animate-pulse">AIが生成中...</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Action Bar -->
+  <footer class="fixed bottom-0 left-0 right-0 glass border-t border-slate-200 pb-safe z-20">
+    <div class="px-6 py-3 flex justify-between items-center relative">
+      <button id="openHistoryBtn" class="p-3 text-slate-400 hover:text-busan transition-colors rounded-full relative">
+        <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+      </button>
+      
+      <!-- Generate Button -->
+      <button id="generateBtn" class="absolute left-1/2 -translate-x-1/2 -top-6 bg-gradient-to-br from-busan to-busan-dark hover:from-busan-light hover:to-busan text-white shadow-lg shadow-busan/40 rounded-full px-8 py-3.5 font-bold flex items-center space-x-2 transition-all transform active:scale-95 group">
+        <i class="fa-solid fa-wand-magic-sparkles text-xl group-hover:animate-pulse"></i>
+        <span class="tracking-wide">変換する</span>
+      </button>
+
+      <button id="openSettingsBtn" class="p-3 text-slate-400 hover:text-busan transition-colors rounded-full">
+        <i class="fa-solid fa-gear text-xl"></i>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-t-3xl p-6 pb-safe transform translate-y-full transition-transform duration-300 shadow-2xl h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center mb-6 shrink-0">
+        <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders text-busan mr-2"></i>設定・データ管理</h2>
+        <button class="close-modal p-2 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="overflow-y-auto flex-1 hide-scrollbar space-y-6">
+        <!-- API Key -->
+        <div class="space-y-2">
+          <label class="block text-sm font-semibold text-slate-700">Gemini API Key <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input type="password" id="apiKeyInput" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow" placeholder="AI Studioで取得したキーを入力">
+            <button id="toggleApiKey" class="absolute right-3 top-3 text-slate-400"><i class="fa-regular fa-eye"></i></button>
+          </div>
+          <p class="text-xs text-slate-400">キーはブラウザ内部(IndexedDB)に暗号化されず保存されます。端末外へは送信されません。</p>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Backup & Restore -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-slate-700">自動バックアップ（直近5世代）</h3>
+          <p class="text-xs text-slate-500">生成完了時に自動保存されます。タップで状態を復元します。</p>
+          <div id="backupList" class="space-y-2">
+            <!-- Backups injected here -->
+            <p class="text-sm text-slate-400 italic">バックアップはありません。</p>
+          </div>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Import / Export -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-slate-700">データの入出力</h3>
+          <div class="flex space-x-3">
+            <button id="exportBtn" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-semibold transition-colors flex justify-center items-center space-x-2">
+              <i class="fa-solid fa-download"></i><span>エクスポート</span>
+            </button>
+            <label class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-semibold transition-colors flex justify-center items-center space-x-2 cursor-pointer">
+              <i class="fa-solid fa-upload"></i><span>インポート</span>
+              <input type="file" id="importFile" accept=".json" class="hidden">
+            </label>
+          </div>
+          <p class="text-xs text-slate-400">キャッシュ消去対策として、定期的なエクスポートを推奨します。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div id="historyModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-t-3xl p-6 pb-safe transform translate-y-full transition-transform duration-300 shadow-2xl h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center mb-6 shrink-0">
+        <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-clock-rotate-left text-busan mr-2"></i>履歴</h2>
+        <button class="close-modal p-2 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="overflow-y-auto flex-1 hide-scrollbar" id="historyList">
+        <!-- History items injected here -->
+        <div class="flex flex-col items-center justify-center h-full text-slate-400 space-y-3">
+          <i class="fa-regular fa-folder-open text-4xl"></i>
+          <p>履歴がありません</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-50 transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-4">
+    通知メッセージ
+  </div>
+
+  <script>
+    /* =========================================
+     * 1. Utilities & Service Worker Setup
+     * ========================================= */
+    const utils = {
+      debounce: (func, wait) => {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      },
+      formatDate: (ts) => {
+        const d = new Date(ts);
+        return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      },
+      showToast: (msg) => {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.remove('opacity-0', '-translate-y-4');
+        t.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+          t.classList.remove('opacity-100', 'translate-y-0');
+          t.classList.add('opacity-0', '-translate-y-4');
+        }, 2500);
+      },
+      updateStatus: (msg, icon = 'fa-cloud-arrow-up') => {
+        const el = document.getElementById('statusIndicator');
+        el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${msg}</span>`;
+        el.classList.add('text-busan');
+        setTimeout(() => el.classList.remove('text-busan'), 1000);
+      }
+    };
+
+    // Service Worker for PWA (Inline Blob)
+    const swCode = `
+      const CACHE_NAME = 'busanboy-v1';
+      self.addEventListener('install', (e) => { self.skipWaiting(); });
+      self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+      self.addEventListener('fetch', (e) => {
+        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(console.error);
+    }
+
+    /* =========================================
+     * 2. IndexedDB Wrapper
+     * ========================================= */
+    class AppDB {
+      constructor() {
+        this.dbName = 'BusanBoyDB';
+        this.version = 1;
+        this.db = null;
+      }
+      async init() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open(this.dbName, this.version);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('state')) db.createObjectStore('state');
+            if (!db.objectStoreNames.contains('history')) db.createObjectStore('history', { keyPath: 'id' });
+            if (!db.objectStoreNames.contains('backups')) db.createObjectStore('backups', { keyPath: 'timestamp' });
+          };
+          req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+          req.onerror = (e) => reject(e.target.error);
+        });
+      }
+      _tx(storeName, mode) {
+        return this.db.transaction(storeName, mode).objectStore(storeName);
+      }
+      async get(storeName, key) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readonly').get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+      async set(storeName, key, value) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readwrite').put(value, key);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
+      async put(storeName, value) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readwrite').put(value);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
+      async getAll(storeName) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readonly').getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+      async delete(storeName, key) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readwrite').delete(key);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
+      async clear(storeName) {
+        return new Promise((resolve, reject) => {
+          const req = this._tx(storeName, 'readwrite').clear();
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
+    }
+
+    /* =========================================
+     * 3. Web Worker for Gemini API (SSE Stream)
+     * ========================================= */
+    const workerCode = `
+      self.onmessage = async (e) => {
+        const { apiKey, text, mode, sessionId } = e.data;
+        if (e.data.type === 'terminate') { self.close(); return; }
+
+        let systemInstruction = "";
+        if (mode === 'busan') {
+          systemInstruction = "あなたは韓国・釜山出身の20代男性です。親しみやすく、男らしく、少し強気で情熱的な性格です。ユーザーの日本語を、釜山方言（慶尚道方言）を使った韓国語に意訳してください。出力フォーマットはMarkdownを使用し、最初に【🇰🇷釜山方言での意訳】、次に【🇯🇵その日本語訳（直訳気味でOK）】、最後に【📝解説や一言（釜山男らしく）】を含めてください。";
+        } else if (mode === 'ja2ko') {
+          systemInstruction = "あなたは優秀な翻訳者です。ユーザーの日本語を自然な標準韓国語に翻訳してください。出力は翻訳結果のみを提示してください。";
+        } else if (mode === 'ko2ja') {
+          systemInstruction = "あなたは優秀な翻訳者です。ユーザーの韓国語を自然な日本語に翻訳してください。出力は翻訳結果のみを提示してください。";
+        }
+
+        const payload = {
+          contents: [{ role: "user", parts: [{ text }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: { temperature: 0.7 }
+        };
+
+        try {
+          const url = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=\${apiKey}\`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error?.message || 'APIリクエストに失敗しました');
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\\n');
+            buffer = lines.pop(); 
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.substring(6).trim();
+                if (dataStr === '[DONE]') continue;
+                if (!dataStr) continue;
+                try {
+                  const data = JSON.parse(dataStr);
+                  const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  if (textChunk) {
+                    self.postMessage({ type: 'chunk', text: textChunk, sessionId });
+                  }
+                } catch(err) {
+                  // 無視（不完全なJSON対策）
+                }
+              }
+            }
+          }
+          self.postMessage({ type: 'done', sessionId });
+        } catch (error) {
+          self.postMessage({ type: 'error', error: error.message, sessionId });
+        }
+      };
+    `;
+    let aiWorker = null;
+    function createWorker() {
+      if(aiWorker) aiWorker.terminate();
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      aiWorker = new Worker(URL.createObjectURL(blob));
+    }
+
+    /* =========================================
+     * 4. Main Application Controller
+     * ========================================= */
+    class App {
+      constructor() {
+        this.db = new AppDB();
+        this.state = {
+          apiKey: '',
+          mode: 'busan',
+          inputText: '',
+          outputText: '',
+          isGenerating: false,
+          currentSessionId: null
+        };
+        this.wakeLock = null;
+        
+        // DOM Elements
+        this.els = {
+          inputText: document.getElementById('inputText'),
+          outputText: document.getElementById('outputText'),
+          outputContainer: document.getElementById('outputContainer'),
+          generateBtn: document.getElementById('generateBtn'),
+          clearBtn: document.getElementById('clearBtn'),
+          copyBtn: document.getElementById('copyBtn'),
+          loadingOverlay: document.getElementById('loadingOverlay'),
+          apiKeyInput: document.getElementById('apiKeyInput'),
+          modeBtns: document.querySelectorAll('.mode-btn'),
+          modeBg: document.getElementById('modeBg'),
+          modeDesc: document.getElementById('modeDesc')
+        };
+        
+        this.modeDescriptions = {
+          'busan': '釜山の20代男性風（男らしく親しみやすい方言）に意訳します。',
+          'ja2ko': '日本語を自然な標準韓国語に翻訳します。',
+          'ko2ja': '韓国語を自然な日本語に翻訳します。'
+        };
+
+        this.debouncedSave = utils.debounce(() => this.saveState(), 1000);
+      }
+
+      async init() {
+        await this.db.init();
+        await this.loadState();
+        this.bindEvents();
+        createWorker();
+        this.updateUI();
+        
+        // Settings / History modals logic
+        this.initModals();
+      }
+
+      async loadState() {
+        const saved = await this.db.get('state', 'appState');
+        if (saved) {
+          this.state = { ...this.state, ...saved, isGenerating: false };
+        }
+      }
+
+      async saveState(skipStatus = false) {
+        if(!skipStatus) utils.updateStatus('Saving...');
+        await this.db.set('state', 'appState', {
+          apiKey: this.state.apiKey,
+          mode: this.state.mode,
+          inputText: this.state.inputText,
+          outputText: this.state.outputText
+        });
+        if(!skipStatus) setTimeout(() => utils.updateStatus('Saved'), 500);
+      }
+
+      bindEvents() {
+        // Input tracking with autosave
+        this.els.inputText.addEventListener('input', (e) => {
+          this.state.inputText = e.target.value;
+          this.debouncedSave();
+        });
+
+        // Mode switching
+        this.els.modeBtns.forEach((btn, index) => {
+          btn.addEventListener('click', () => {
+            if(this.state.isGenerating) return;
+            this.state.mode = btn.dataset.mode;
+            this.state.outputText = ''; // Clear output on mode change
+            this.updateModeUI(index);
+            this.saveState();
+            this.updateUI();
+          });
+        });
+
+        // Actions
+        this.els.clearBtn.addEventListener('click', () => {
+          if(this.state.isGenerating) return;
+          this.state.inputText = '';
+          this.state.outputText = '';
+          this.els.inputText.value = '';
+          this.saveState();
+          this.updateUI();
+        });
+
+        this.els.copyBtn.addEventListener('click', () => {
+          const rawText = this.els.outputText.innerText;
+          if(rawText) {
+            navigator.clipboard.writeText(rawText);
+            utils.showToast('クリップボードにコピーしました');
+          }
+        });
+
+        this.els.generateBtn.addEventListener('click', () => this.toggleGeneration());
+
+        // API Key Settings
+        this.els.apiKeyInput.addEventListener('input', (e) => {
+          this.state.apiKey = e.target.value.trim();
+          this.debouncedSave();
+        });
+        
+        document.getElementById('toggleApiKey').addEventListener('click', (e) => {
+          const t = this.els.apiKeyInput.type;
+          this.els.apiKeyInput.type = t === 'password' ? 'text' : 'password';
+          e.currentTarget.innerHTML = t === 'password' ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
+        });
+      }
+
+      updateModeUI(activeIndex = -1) {
+        if(activeIndex === -1) {
+          this.els.modeBtns.forEach((b, i) => { if(b.dataset.mode === this.state.mode) activeIndex = i; });
+        }
+        const positions = ['left-1', 'left-[33.3%]', 'left-[66.6%]'];
+        this.els.modeBg.className = `absolute top-1 bottom-1 w-[32%] bg-busan-light border border-busan/20 rounded-xl transition-all duration-300 ease-out shadow-sm ${positions[activeIndex]}`;
+        
+        this.els.modeBtns.forEach((btn, i) => {
+          if (i === activeIndex) {
+            btn.classList.replace('text-slate-500', 'text-busan-dark');
+            btn.classList.add('font-bold');
+          } else {
+            btn.classList.replace('text-busan-dark', 'text-slate-500');
+            btn.classList.remove('font-bold');
+          }
+        });
+        this.els.modeDesc.textContent = this.modeDescriptions[this.state.mode];
+      }
+
+      updateUI() {
+        this.els.inputText.value = this.state.inputText;
+        this.els.apiKeyInput.value = this.state.apiKey;
+        this.updateModeUI();
+
+        if (this.state.outputText || this.state.isGenerating) {
+          this.els.outputContainer.classList.remove('hidden');
+          this.els.outputContainer.classList.add('flex');
+          // Parse Markdown
+          const dirty = marked.parse(this.state.outputText || '*待機中...*');
+          this.els.outputText.innerHTML = DOMPurify.sanitize(dirty);
+        } else {
+          this.els.outputContainer.classList.add('hidden');
+          this.els.outputContainer.classList.remove('flex');
+        }
+
+        if (this.state.isGenerating) {
+          this.els.generateBtn.innerHTML = '<i class="fa-solid fa-stop text-xl"></i><span>停止する</span>';
+          this.els.generateBtn.classList.replace('from-busan', 'from-red-500');
+          this.els.generateBtn.classList.replace('to-busan-dark', 'to-red-700');
+          this.els.generateBtn.classList.replace('hover:from-busan-light', 'hover:from-red-400');
+          this.els.generateBtn.classList.replace('hover:to-busan', 'hover:to-red-600');
+          this.els.generateBtn.classList.replace('shadow-busan/40', 'shadow-red-500/40');
+        } else {
+          this.els.generateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-xl group-hover:animate-pulse"></i><span class="tracking-wide">変換する</span>';
+          this.els.generateBtn.classList.replace('from-red-500', 'from-busan');
+          this.els.generateBtn.classList.replace('to-red-700', 'to-busan-dark');
+          this.els.generateBtn.classList.replace('hover:from-red-400', 'hover:from-busan-light');
+          this.els.generateBtn.classList.replace('hover:to-red-600', 'hover:to-busan');
+          this.els.generateBtn.classList.replace('shadow-red-500/40', 'shadow-busan/40');
+          this.els.loadingOverlay.classList.add('hidden');
+        }
+      }
+
+      async toggleGeneration() {
+        if (this.state.isGenerating) {
+          // Stop generation
+          createWorker(); // Recreate worker to kill current execution
+          this.finishGeneration();
+          utils.showToast('生成を中断しました');
+          return;
+        }
+
+        if (!this.state.apiKey) {
+          document.getElementById('openSettingsBtn').click();
+          utils.showToast('APIキーを設定してください');
+          return;
+        }
+        if (!this.state.inputText.trim()) {
+          utils.showToast('テキストを入力してください');
+          return;
+        }
+
+        // Start Generation
+        this.state.isGenerating = true;
+        this.state.outputText = '';
+        this.state.currentSessionId = Date.now().toString();
+        this.updateUI();
+        this.els.loadingOverlay.classList.remove('hidden');
+        
+        await this.requestWakeLock();
+
+        // Scroll to output
+        setTimeout(() => {
+          this.els.outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+
+        aiWorker.onmessage = (e) => this.handleWorkerMessage(e);
+        aiWorker.postMessage({
+          apiKey: this.state.apiKey,
+          text: this.state.inputText,
+          mode: this.state.mode,
+          sessionId: this.state.currentSessionId
+        });
+      }
+
+      handleWorkerMessage(e) {
+        const { type, text, error, sessionId } = e.data;
+        if (sessionId !== this.state.currentSessionId) return;
+
+        if (type === 'chunk') {
+          if(this.els.loadingOverlay.classList.contains('hidden') === false) {
+            this.els.loadingOverlay.classList.add('hidden'); // Hide loader on first chunk
+          }
+          this.state.outputText += text;
+          // Render chunk
+          const dirty = marked.parse(this.state.outputText);
+          this.els.outputText.innerHTML = DOMPurify.sanitize(dirty);
+          // Auto scroll to bottom of output occasionally (or let user scroll)
+          this.debouncedSave();
+        } else if (type === 'done') {
+          this.finishGeneration(true);
+        } else if (type === 'error') {
+          this.state.outputText = `**エラーが発生しました:**\n${error}`;
+          this.finishGeneration();
+          utils.showToast('エラーが発生しました');
+        }
+      }
+
+      async finishGeneration(success = false) {
+        this.state.isGenerating = false;
+        this.state.currentSessionId = null;
+        this.updateUI();
+        this.releaseWakeLock();
+        await this.saveState(true);
+
+        if (success && this.state.outputText.trim()) {
+          await this.saveHistory();
+          await this.createBackup();
+        }
+      }
+
+      // --- Wake Lock ---
+      async requestWakeLock() {
+        try {
+          if ('wakeLock' in navigator) {
+            this.wakeLock = await navigator.wakeLock.request('screen');
+          }
+        } catch (err) { console.warn('Wake Lock error:', err); }
+      }
+      async releaseWakeLock() {
+        if (this.wakeLock !== null) {
+          await this.wakeLock.release();
+          this.wakeLock = null;
+        }
+      }
+
+      // --- Data Management (History & Backup) ---
+      async saveHistory() {
+        const item = {
+          id: Date.now(),
+          mode: this.state.mode,
+          input: this.state.inputText,
+          output: this.state.outputText,
+          timestamp: Date.now()
+        };
+        await this.db.put('history', item);
+      }
+
+      async createBackup() {
+        const history = await this.db.getAll('history');
+        const state = await this.db.get('state', 'appState');
+        const backup = { timestamp: Date.now(), history, state };
+        await this.db.put('backups', backup);
+        
+        // Keep only last 5
+        let backups = await this.db.getAll('backups');
+        if (backups.length > 5) {
+          backups.sort((a, b) => a.timestamp - b.timestamp);
+          const toDelete = backups.slice(0, backups.length - 5);
+          for (const b of toDelete) await this.db.delete('backups', b.timestamp);
+        }
+      }
+
+      // --- Modals Logic ---
+      initModals() {
+        const openModal = (id) => {
+          const el = document.getElementById(id);
+          const content = el.querySelector('div');
+          el.classList.remove('hidden');
+          // Trigger reflow
+          void el.offsetWidth;
+          el.classList.replace('opacity-0', 'opacity-100');
+          content.classList.remove('translate-y-full');
+        };
+        const closeModal = (id) => {
+          const el = document.getElementById(id);
+          const content = el.querySelector('div');
+          el.classList.replace('opacity-100', 'opacity-0');
+          content.classList.add('translate-y-full');
+          setTimeout(() => el.classList.add('hidden'), 300);
+        };
+
+        document.getElementById('openSettingsBtn').addEventListener('click', () => {
+          this.renderBackupList();
+          openModal('settingsModal');
+        });
+        document.getElementById('openHistoryBtn').addEventListener('click', () => {
+          this.renderHistory();
+          openModal('historyModal');
+        });
+
+        document.querySelectorAll('.close-modal').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            closeModal(e.target.closest('.fixed').id);
+          });
+        });
+
+        // Import / Export
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+          const history = await this.db.getAll('history');
+          const state = await this.db.get('state', 'appState');
+          const data = { version: 1, exportedAt: Date.now(), history, state };
+          const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `BusanBoy_Backup_${utils.formatDate(Date.now()).replace(/[\/\s:]/g,'')}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          utils.showToast('エクスポートしました');
+          await this.createBackup(); // trigger internal backup too
+          this.renderBackupList();
+        });
+
+        document.getElementById('importFile').addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              if(!data.state || !Array.isArray(data.history)) throw new Error('Invalid format');
+              await this.db.clear('history');
+              for(const h of data.history) await this.db.put('history', h);
+              await this.db.set('state', 'appState', data.state);
+              utils.showToast('データを復元しました。リロードします...');
+              setTimeout(() => location.reload(), 1500);
+            } catch(err) {
+              alert('ファイルの読み込みに失敗しました。正しいJSONファイルを選択してください。');
+            }
+          };
+          reader.readAsText(file);
+          e.target.value = ''; // reset
+        });
+      }
+
+      async renderBackupList() {
+        const listEl = document.getElementById('backupList');
+        const backups = await this.db.getAll('backups');
+        backups.sort((a, b) => b.timestamp - a.timestamp); // newest first
+        
+        if (backups.length === 0) {
+          listEl.innerHTML = '<p class="text-sm text-slate-400 italic">バックアップはありません。</p>';
+          return;
+        }
+
+        listEl.innerHTML = backups.map((b, i) => `
+          <div class="flex justify-between items-center bg-slate-50 border border-slate-100 p-3 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors" onclick="app.restoreBackup(${b.timestamp})">
+            <div>
+              <div class="text-sm font-bold text-slate-700">世代 ${i+1} <span class="text-xs font-normal text-slate-400 ml-2">${utils.formatDate(b.timestamp)}</span></div>
+              <div class="text-xs text-slate-500 mt-1">履歴: ${b.history.length}件</div>
+            </div>
+            <i class="fa-solid fa-clock-rotate-left text-busan/50"></i>
+          </div>
+        `).join('');
+      }
+
+      async restoreBackup(timestamp) {
+        if(!confirm('現在のデータは上書きされます。よろしいですか？')) return;
+        const backup = await this.db.get('backups', timestamp);
+        if(backup) {
+          await this.db.clear('history');
+          for(const h of backup.history) await this.db.put('history', h);
+          await this.db.set('state', 'appState', backup.state);
+          utils.showToast('バックアップを復元しました');
+          setTimeout(() => location.reload(), 1000);
+        }
+      }
+
+      async renderHistory() {
+        const listEl = document.getElementById('historyList');
+        const history = await this.db.getAll('history');
+        history.sort((a, b) => b.timestamp - a.timestamp);
+        
+        if (history.length === 0) {
+          listEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-slate-400 space-y-3 pt-10">
+              <i class="fa-regular fa-folder-open text-4xl"></i>
+              <p>履歴がありません</p>
+            </div>`;
+          return;
+        }
+
+        const modeLabels = { 'busan': '釜山意訳', 'ja2ko': '日➔韓', 'ko2ja': '韓➔日' };
+        
+        listEl.innerHTML = '<div class="space-y-4">' + history.map(h => `
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-busan/50 transition-colors" onclick="app.loadHistoryItem(${h.id})">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-xs font-bold px-2 py-1 bg-slate-200 text-slate-600 rounded-md">${modeLabels[h.mode] || h.mode}</span>
+              <span class="text-xs text-slate-400">${utils.formatDate(h.timestamp)}</span>
+            </div>
+            <p class="text-sm text-slate-700 font-medium line-clamp-2 mb-2">${h.input}</p>
+            <div class="text-xs text-slate-500 bg-white p-2 rounded-lg border border-slate-100 line-clamp-2">${h.output.replace(/<[^>]*>?/gm, '')}</div>
+          </div>
+        `).join('') + '</div>';
+      }
+
+      async loadHistoryItem(id) {
+        const h = await this.db.get('history', id);
+        if(h) {
+          this.state.mode = h.mode;
+          this.state.inputText = h.input;
+          this.state.outputText = h.output;
+          this.updateUI();
+          this.saveState();
+          document.querySelector('#historyModal .close-modal').click();
+          setTimeout(() => {
+            this.els.outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 300);
+        }
+      }
+    }
+
+    // Initialize App
+    const app = new App();
+    window.addEventListener('DOMContentLoaded', () => {
+      app.init().catch(err => {
+        console.error('App init error:', err);
+        alert('アプリの初期化に失敗しました。ブラウザがIndexedDBをサポートしているか確認してください。');
+      });
+    });
+
+  </script>
+</body>
+</html>
