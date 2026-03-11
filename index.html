@@ -178,7 +178,7 @@
         <button class="close-modal p-2 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
       </div>
       
-      <div class="overflow-y-auto flex-1 hide-scrollbar space-y-6">
+      <div class="overflow-y-auto flex-1 hide-scrollbar space-y-6 pb-6">
         <!-- API Key -->
         <div class="space-y-2">
           <label class="block text-sm font-semibold text-slate-700">Gemini API Key <span class="text-red-500">*</span></label>
@@ -187,6 +187,40 @@
             <button id="toggleApiKey" class="absolute right-3 top-3 text-slate-400"><i class="fa-regular fa-eye"></i></button>
           </div>
           <p class="text-xs text-slate-400">キーはブラウザ内部(IndexedDB)に暗号化されず保存されます。端末外へは送信されません。</p>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Prompt Settings -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-slate-700">プロンプト設定</h3>
+          <p class="text-xs text-slate-500">AIの振る舞いをモードごとにカスタマイズできます。</p>
+          <div class="space-y-4">
+            <!-- Busan -->
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-semibold text-slate-600">釜山意訳</label>
+                <button class="reset-prompt-btn text-xs text-busan hover:text-busan-dark transition-colors" data-mode="busan">デフォルトに戻す</button>
+              </div>
+              <textarea id="prompt-busan" class="prompt-input w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow h-24 resize-none" data-mode="busan"></textarea>
+            </div>
+            <!-- Ja2Ko -->
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-semibold text-slate-600">日 ➔ 韓</label>
+                <button class="reset-prompt-btn text-xs text-busan hover:text-busan-dark transition-colors" data-mode="ja2ko">デフォルトに戻す</button>
+              </div>
+              <textarea id="prompt-ja2ko" class="prompt-input w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow h-16 resize-none" data-mode="ja2ko"></textarea>
+            </div>
+            <!-- Ko2Ja -->
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-semibold text-slate-600">韓 ➔ 日</label>
+                <button class="reset-prompt-btn text-xs text-busan hover:text-busan-dark transition-colors" data-mode="ko2ja">デフォルトに戻す</button>
+              </div>
+              <textarea id="prompt-ko2ja" class="prompt-input w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-busan/50 transition-shadow h-16 resize-none" data-mode="ko2ja"></textarea>
+            </div>
+          </div>
         </div>
 
         <hr class="border-slate-100">
@@ -365,17 +399,8 @@
      * ========================================= */
     const workerCode = `
       self.onmessage = async (e) => {
-        const { apiKey, text, mode, sessionId } = e.data;
+        const { apiKey, text, systemInstruction, sessionId } = e.data;
         if (e.data.type === 'terminate') { self.close(); return; }
-
-        let systemInstruction = "";
-        if (mode === 'busan') {
-          systemInstruction = "あなたは韓国・釜山出身の20代男性です。親しみやすく、男らしく、少し強気で情熱的な性格です。ユーザーの日本語を、釜山方言（慶尚道方言）を使った韓国語に意訳してください。出力フォーマットはMarkdownを使用し、最初に【🇰🇷釜山方言での意訳】、次に【🇯🇵その日本語訳（直訳気味でOK）】、最後に【📝解説や一言（釜山男らしく）】を含めてください。";
-        } else if (mode === 'ja2ko') {
-          systemInstruction = "あなたは優秀な翻訳者です。ユーザーの日本語を自然な標準韓国語に翻訳してください。出力は翻訳結果のみを提示してください。";
-        } else if (mode === 'ko2ja') {
-          systemInstruction = "あなたは優秀な翻訳者です。ユーザーの韓国語を自然な日本語に翻訳してください。出力は翻訳結果のみを提示してください。";
-        }
 
         const payload = {
           contents: [{ role: "user", parts: [{ text }] }],
@@ -444,13 +469,21 @@
     class App {
       constructor() {
         this.db = new AppDB();
+        
+        this.defaultPrompts = {
+          'busan': "あなたは韓国・釜山出身の20代男性です。親しみやすく、男らしく、少し強気で情熱的な性格です。ユーザーの日本語を、釜山方言（慶尚道方言）を使った韓国語に意訳してください。出力フォーマットはMarkdownを使用し、最初に【🇰🇷釜山方言での意訳】、次に【🇯🇵その日本語訳（直訳気味でOK）】、最後に【📝解説や一言（釜山男らしく）】を含めてください。",
+          'ja2ko': "あなたは優秀な翻訳者です。ユーザーの日本語を自然な標準韓国語に翻訳してください。出力は翻訳結果のみを提示してください。",
+          'ko2ja': "あなたは優秀な翻訳者です。ユーザーの韓国語を自然な日本語に翻訳してください。出力は翻訳結果のみを提示してください。"
+        };
+
         this.state = {
           apiKey: '',
           mode: 'busan',
           inputText: '',
           outputText: '',
           isGenerating: false,
-          currentSessionId: null
+          currentSessionId: null,
+          customPrompts: { busan: '', ja2ko: '', ko2ja: '' }
         };
         this.wakeLock = null;
         
@@ -492,7 +525,12 @@
       async loadState() {
         const saved = await this.db.get('state', 'appState');
         if (saved) {
-          this.state = { ...this.state, ...saved, isGenerating: false };
+          this.state = { 
+            ...this.state, 
+            ...saved, 
+            customPrompts: { ...this.state.customPrompts, ...(saved.customPrompts || {}) },
+            isGenerating: false 
+          };
         }
       }
 
@@ -502,7 +540,8 @@
           apiKey: this.state.apiKey,
           mode: this.state.mode,
           inputText: this.state.inputText,
-          outputText: this.state.outputText
+          outputText: this.state.outputText,
+          customPrompts: this.state.customPrompts
         });
         if(!skipStatus) setTimeout(() => utils.updateStatus('Saved'), 500);
       }
@@ -557,6 +596,26 @@
           this.els.apiKeyInput.type = t === 'password' ? 'text' : 'password';
           e.currentTarget.innerHTML = t === 'password' ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
         });
+
+        // Custom Prompts
+        document.querySelectorAll('.prompt-input').forEach(el => {
+          el.addEventListener('input', (e) => {
+            const m = e.target.dataset.mode;
+            this.state.customPrompts[m] = e.target.value;
+            this.debouncedSave();
+          });
+        });
+
+        document.querySelectorAll('.reset-prompt-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const m = e.target.dataset.mode;
+            this.state.customPrompts[m] = '';
+            const el = document.getElementById(`prompt-${m}`);
+            if(el) el.value = this.defaultPrompts[m];
+            this.saveState();
+            utils.showToast('デフォルトプロンプトに戻しました');
+          });
+        });
       }
 
       updateModeUI(activeIndex = -1) {
@@ -582,6 +641,15 @@
         this.els.inputText.value = this.state.inputText;
         this.els.apiKeyInput.value = this.state.apiKey;
         this.updateModeUI();
+
+        // Update Prompt Textareas
+        ['busan', 'ja2ko', 'ko2ja'].forEach(m => {
+          const el = document.getElementById(`prompt-${m}`);
+          if(el) {
+            const targetVal = this.state.customPrompts[m] || this.defaultPrompts[m];
+            if(el.value !== targetVal) el.value = targetVal;
+          }
+        });
 
         if (this.state.outputText || this.state.isGenerating) {
           this.els.outputContainer.classList.remove('hidden');
@@ -645,11 +713,13 @@
           this.els.outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
 
+        const currentPrompt = this.state.customPrompts[this.state.mode] || this.defaultPrompts[this.state.mode];
+
         aiWorker.onmessage = (e) => this.handleWorkerMessage(e);
         aiWorker.postMessage({
           apiKey: this.state.apiKey,
           text: this.state.inputText,
-          mode: this.state.mode,
+          systemInstruction: currentPrompt,
           sessionId: this.state.currentSessionId
         });
       }
